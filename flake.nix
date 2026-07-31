@@ -32,7 +32,7 @@
             cargo
             crate2nix
             rust-analyzer
-            nixd
+            nil
             rustc
             rustfmt
             clippy
