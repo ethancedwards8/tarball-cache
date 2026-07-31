@@ -34,6 +34,7 @@
             rust-analyzer
             nixd
             rustc
+            rustfmt
             clippy
           ];
         }
