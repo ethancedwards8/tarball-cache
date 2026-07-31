@@ -2,6 +2,7 @@ use axum::{
     routing::get,
     Router,
     Json,
+    http::StatusCode,
 };
 use serde::Serialize;
 
@@ -23,6 +24,6 @@ async fn main() {
    axum::serve(listener, app).await.unwrap();
 }
 
-async fn fallback() -> Json<ErrResponse> {
-    Json(ErrResponse{ error: "expected /github/{owner}/{repo}/{rev}.tar.gz"})
+async fn fallback() -> (StatusCode, Json<ErrResponse>) {
+    (StatusCode::BAD_REQUEST, Json(ErrResponse{ error: "expected /github/{owner}/{repo}/{rev}.tar.gz"}))
 }
