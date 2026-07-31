@@ -45,9 +45,9 @@ async fn serve_github_tarball(Path((owner, repo, archive)): Path<(String, String
     let value = state.cached_tarballs.read().unwrap().contains_key(&key);
 
     if value {
-        (StatusCode::OK, format!("yay")).into_response()
+        (StatusCode::OK, "yay".to_string()).into_response()
     } else {
-        let data = state.cached_tarballs.write().unwrap().insert(key, true);
+        state.cached_tarballs.write().unwrap().insert(key, true);
         Redirect::temporary(format!("https://github.com/{owner}/{repo}/archive/{archive}").as_str()).into_response()
     }
 }

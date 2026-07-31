@@ -21,7 +21,7 @@
       devShell = forAllSystems (system:
         let
           pkgs = import nixpkgs {
-            inherit system; 
+            inherit system;
             overlays = [ inputs.crate2nix.overlays.default ];
           };
         in
@@ -34,6 +34,7 @@
             rust-analyzer
             nixd
             rustc
+            clippy
           ];
         }
       );
@@ -51,4 +52,3 @@
 
     };
 }
-
