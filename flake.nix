@@ -31,6 +31,9 @@
             git
             cargo
             crate2nix
+            rust-analyzer
+            nixd
+            rustc
           ];
         }
       );
