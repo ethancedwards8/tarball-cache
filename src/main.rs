@@ -5,6 +5,9 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
+use s3::Bucket;
+use s3::Region;
+use s3::creds::Credentials;
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -22,6 +25,19 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    let bucket = Bucket::new(
+        "tarball-cache",
+        Region::R2 {
+            account_id: "14a8704b05622c623affefb0d8dd93d4".to_string(),
+        },
+        Credentials::default().unwrap(),
+    )
+    .unwrap();
+
+    let content = "I want to go to R2".as_bytes();
+
+    let _response_data = bucket.put_object("/test.file", content).await;
+
     let shared_state = Arc::new(AppState {
         cached_tarballs: RwLock::new(HashMap::new()),
     });
