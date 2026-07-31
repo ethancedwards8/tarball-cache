@@ -25,7 +25,9 @@ jobs:
         with:
           name: ethancedwards8
           authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+
       - name: Build
+        if: always()
         run: nix build -L
 
       - name: Deploy
