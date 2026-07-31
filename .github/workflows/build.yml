@@ -1,0 +1,43 @@
+name: Build & Push
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build and Push Config
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, ubuntu-24.04-arm]
+        include:
+          - os: ubuntu-latest
+            release_suffix: ubuntu
+          - os: macos-latest
+            release_suffix: mac
+          - os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
+      - uses: cachix/cachix-action@v15
+        with:
+          name: ethancedwards8
+          authToken: "${{ secrets.CACHIX_AUTH_TOKEN }}"
+      - name: x86_64-linux Build
+        if: matrix.os == 'ubuntu-latest'
+        run: nix build -vL
+
+      - name: aarch64 Build
+        if: matrix.os == 'ubuntu-24.04-arm'
+        run: nix build -vL
+
+      - name: MacOS Build
+        if: matrix.os == 'macos-latest'
+        run: nix build -vL
+
+      - name: Deploy
+        run: |
+          cachix push ethancedwards8 ./result*
+
