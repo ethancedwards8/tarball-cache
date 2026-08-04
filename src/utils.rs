@@ -1,5 +1,6 @@
+#[derive(Clone, Copy)]
 pub struct Forge {
-    name: &'static str,
+    pub name: &'static str,
     baseurl: &'static str,
 }
 
@@ -13,6 +14,8 @@ pub const GITHUB: Forge = Forge::new("github", "https://github.com/{}/{}/archive
 pub const GITLAB: Forge = Forge::new("gitlab", "https://gitlab.com/{}/{}/-/archive/{}");
 pub const CODEBERG: Forge = Forge::new("codeberg", "https://codeberg.org/{}/{}/archive/{}");
 pub const SOURCEHUT: Forge = Forge::new("sourcehut", "https://git.sr.ht/~{}/{}/archive/{}");
+
+pub const FORGES: [Forge; 4] = [GITHUB, GITLAB, CODEBERG, SOURCEHUT];
 
 pub struct Tarball {
     forge: Forge,
@@ -112,6 +115,7 @@ mod tests {
         )
     }
 
+    // more testing for these because they're not just internal state...
     #[test]
     fn check_url() {
         assert_eq!(

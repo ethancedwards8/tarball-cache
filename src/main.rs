@@ -16,7 +16,9 @@ use std::{
 };
 
 pub mod utils;
-use utils::{GITHUB, Tarball};
+use utils::Tarball;
+
+use crate::utils::FORGES;
 
 #[derive(Serialize)]
 struct ErrResponse {
@@ -24,7 +26,7 @@ struct ErrResponse {
 }
 
 struct AppState {
-    cached_tarballs: RwLock<HashMap<String, bool>>,
+    cached_tarballs: RwLock<HashMap<String, String>>,
     tarball_bucket: Box<Bucket>,
 }
 
@@ -46,7 +48,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(fallback))
-        .route("/github/{owner}/{repo}/{archive}", get(serve_tarball))
+        .route("/{forge}/{owner}/{repo}/{archive}", get(serve_tarball))
         .fallback(fallback)
         .with_state(shared_state);
 
@@ -58,10 +60,12 @@ async fn main() {
 }
 
 async fn serve_tarball(
-    Path((owner, repo, archive)): Path<(String, String, String)>,
+    Path((forge, owner, repo, archive)): Path<(String, String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let tarball: Tarball = Tarball::new(GITHUB, owner, repo, archive);
+    let forgepath = FORGES.iter().find(|f| f.name == forge).unwrap();
+
+    let tarball: Tarball = Tarball::new(*forgepath, owner, repo, archive);
 
     let key = tarball.get_key();
 
@@ -97,9 +101,7 @@ async fn serve_tarball(
                 .cached_tarballs
                 .write()
                 .unwrap()
-                .insert(tarball.get_key(), true);
-
-            state.cached_tarballs.write().unwrap().insert(key, true);
+                .insert(tarball.get_key(), tarball.get_path());
         }
         Redirect::temporary(tarball.get_url().as_str()).into_response()
     }
