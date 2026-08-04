@@ -7,9 +7,8 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
-use s3::Bucket;
-use s3::Region;
 use s3::creds::Credentials;
+use s3::{Bucket, Region};
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -22,13 +21,6 @@ use utils::*;
 #[derive(Serialize)]
 struct ErrResponse {
     error: &'static str,
-}
-
-pub struct Tarball {
-    forge: String, // should be an enum but will handle later
-    owner: String,
-    repo: String,
-    archive: String,
 }
 
 struct AppState {
@@ -72,21 +64,16 @@ async fn serve_github_tarball(
     Path((owner, repo, archive)): Path<(String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let tarball: Tarball = Tarball {
-        forge: "github".to_string(),
-        owner,
-        repo,
-        archive,
-    };
+    let tarball: Tarball = Tarball::new("github".to_string(), owner, repo, archive);
 
-    let key = create_cache_key(&tarball);
+    let key = tarball.get_key();
 
     if state.cached_tarballs.read().unwrap().contains_key(&key) {
         let tarball_object = state
             .tarball_bucket
-            .get_object(get_bucket_path(&tarball))
+            .get_object(tarball.get_path())
             .await
-            .unwrap();
+            .expect("Unexpected entry in hashtable.");
 
         if tarball_object.status_code() == 200 {
             (StatusCode::OK, tarball_object.bytes().clone()).into_response()
@@ -96,7 +83,7 @@ async fn serve_github_tarball(
         }
     } else {
         {
-            let res = reqwest::get(github_url(&tarball))
+            let res = reqwest::get(tarball.get_url())
                 .await
                 .expect("Tarball could not be fetched")
                 .bytes()
@@ -105,7 +92,7 @@ async fn serve_github_tarball(
 
             state
                 .tarball_bucket
-                .put_object(get_bucket_path(&tarball), &res)
+                .put_object(tarball.get_path(), &res)
                 .await
                 .expect("Failed to upload tarball to s3");
 
@@ -113,7 +100,7 @@ async fn serve_github_tarball(
                 .cached_tarballs
                 .write()
                 .unwrap()
-                .insert(create_cache_key(&tarball), true);
+                .insert(tarball.get_key(), true);
 
             state.cached_tarballs.write().unwrap().insert(key, true);
         }
@@ -132,15 +119,7 @@ async fn fallback() -> (StatusCode, Json<ErrResponse>) {
 
 #[inline]
 fn serve_github_upstream(tarball: &Tarball) -> Response {
-    #[allow(unused_variables)]
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-
-    let upstream_url = github_url(&tarball);
+    let upstream_url = tarball.get_url();
 
     Redirect::temporary(upstream_url.as_str()).into_response()
 }

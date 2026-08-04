@@ -1,35 +1,38 @@
-use crate::Tarball;
-
-#[inline]
-pub fn create_cache_key(tarball: &Tarball) -> String {
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("{forge}-{owner}-{repo}-{archive}")
+pub struct Tarball {
+    forge: String, // should be an enum but will handle later
+    owner: String,
+    repo: String,
+    archive: String,
 }
 
-#[inline]
-pub fn get_bucket_path(tarball: &Tarball) -> String {
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("{forge}/{owner}/{repo}/{archive}")
-}
+impl Tarball {
+    pub fn new(forge: String, owner: String, repo: String, archive: String) -> Tarball {
+        Tarball {
+            forge,
+            owner,
+            repo,
+            archive,
+        }
+    }
 
-#[inline]
-pub fn github_url(tarball: &Tarball) -> String {
-    #[allow(unused_variables)]
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("https://github.com/{owner}/{repo}/archive/{archive}")
+    pub fn get_key(&self) -> String {
+        format!(
+            "{}-{}-{}-{}",
+            self.forge, self.owner, self.repo, self.archive
+        )
+    }
+
+    pub fn get_path(&self) -> String {
+        format!(
+            "{}/{}/{}/{}",
+            self.forge, self.owner, self.repo, self.archive
+        )
+    }
+
+    pub fn get_url(&self) -> String {
+        format!(
+            "https://github.com/{}/{}/archive/{}",
+            self.owner, self.repo, self.archive
+        )
+    }
 }
