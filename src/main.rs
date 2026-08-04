@@ -79,7 +79,7 @@ async fn serve_github_tarball(
             (StatusCode::OK, tarball_object.bytes().clone()).into_response()
         } else {
             println!("We probably shouldn't have reached this state, but here we are...");
-            return serve_github_upstream(&tarball);
+            Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
         {
@@ -104,7 +104,7 @@ async fn serve_github_tarball(
 
             state.cached_tarballs.write().unwrap().insert(key, true);
         }
-        return serve_github_upstream(&tarball);
+        Redirect::temporary(tarball.get_url().as_str()).into_response()
     }
 }
 
@@ -115,11 +115,4 @@ async fn fallback() -> (StatusCode, Json<ErrResponse>) {
             error: "expected /github/{owner}/{repo}/{archive} with .tar.gz",
         }),
     )
-}
-
-#[inline]
-fn serve_github_upstream(tarball: &Tarball) -> Response {
-    let upstream_url = tarball.get_url();
-
-    Redirect::temporary(upstream_url.as_str()).into_response()
 }
