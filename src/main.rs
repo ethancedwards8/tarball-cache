@@ -19,8 +19,16 @@ struct ErrResponse {
     error: &'static str,
 }
 
+struct Tarball {
+    forge: String, // should be an enum but will handle later
+    owner: String,
+    repo: String,
+    archive: String,
+}
+
 struct AppState {
     cached_tarballs: RwLock<HashMap<String, bool>>,
+    tarball_bucket: Box<Bucket>,
 }
 
 #[tokio::main]
@@ -32,14 +40,11 @@ async fn main() {
         },
         Credentials::default().unwrap(),
     )
-    .unwrap();
-
-    let content = "I want to go to R2".as_bytes();
-
-    let _response_data = bucket.put_object("/test.file", content).await;
+    .expect("Bucket access failed");
 
     let shared_state = Arc::new(AppState {
         cached_tarballs: RwLock::new(HashMap::new()),
+        tarball_bucket: bucket,
     });
 
     let app = Router::new()
@@ -58,22 +63,105 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-fn create_github_key(owner: String, repo: String, archive: String) -> String {
-    format!("github-{owner}-{repo}-{archive}")
+#[inline]
+fn create_cache_key(tarball: &Tarball) -> String {
+    let Tarball {
+        forge,
+        owner,
+        repo,
+        archive,
+    } = tarball;
+    format!("{forge}-{owner}-{repo}-{archive}")
+}
+
+#[inline]
+fn get_bucket_path(tarball: &Tarball) -> String {
+    let Tarball {
+        forge,
+        owner,
+        repo,
+        archive,
+    } = tarball;
+    format!("{forge}/{owner}/{repo}/{archive}")
+}
+
+#[inline]
+fn github_url(tarball: &Tarball) -> String {
+    #[allow(unused_variables)]
+    let Tarball {
+        forge,
+        owner,
+        repo,
+        archive,
+    } = tarball;
+    format!("https://github.com/{owner}/{repo}/archive/{archive}")
+}
+
+#[inline]
+fn serve_github_upstream(tarball: &Tarball) -> Response {
+    #[allow(unused_variables)]
+    let Tarball {
+        forge,
+        owner,
+        repo,
+        archive,
+    } = tarball;
+
+    let upstream_url = github_url(&tarball);
+
+    Redirect::temporary(upstream_url.as_str()).into_response()
 }
 
 async fn serve_github_tarball(
     Path((owner, repo, archive)): Path<(String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let key = create_github_key(owner.clone(), repo.clone(), archive.clone());
+    let tarball: Tarball = Tarball {
+        forge: "github".to_string(),
+        owner,
+        repo,
+        archive,
+    };
+
+    let key = create_cache_key(&tarball);
 
     if state.cached_tarballs.read().unwrap().contains_key(&key) {
-        (StatusCode::OK, "yay".to_string()).into_response()
+        let tarball_object = state
+            .tarball_bucket
+            .get_object(get_bucket_path(&tarball))
+            .await
+            .unwrap();
+
+        if tarball_object.status_code() == 200 {
+            (StatusCode::OK, tarball_object.bytes().clone()).into_response()
+        } else {
+            println!("We probably shouldn't have reached this state, but here we are...");
+            return serve_github_upstream(&tarball);
+        }
     } else {
-        state.cached_tarballs.write().unwrap().insert(key, true);
-        Redirect::temporary(format!("https://github.com/{owner}/{repo}/archive/{archive}").as_str())
-            .into_response()
+        {
+            let res = reqwest::get(github_url(&tarball))
+                .await
+                .expect("Tarball could not be fetched")
+                .bytes()
+                .await
+                .unwrap();
+
+            state
+                .tarball_bucket
+                .put_object(get_bucket_path(&tarball), &res)
+                .await
+                .expect("Failed to upload tarball to s3");
+
+            state
+                .cached_tarballs
+                .write()
+                .unwrap()
+                .insert(create_cache_key(&tarball), true);
+
+            state.cached_tarballs.write().unwrap().insert(key, true);
+        }
+        return serve_github_upstream(&tarball);
     }
 }
 
@@ -81,7 +169,7 @@ async fn fallback() -> (StatusCode, Json<ErrResponse>) {
     (
         StatusCode::BAD_REQUEST,
         Json(ErrResponse {
-            error: "expected /github/{owner}/{repo}/{archive} with .tar.gz and .zip supported",
+            error: "expected /github/{owner}/{repo}/{archive} with .tar.gz",
         }),
     )
 }
