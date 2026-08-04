@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 use axum::{
     Json, Router,
     extract::{Path, State},
@@ -14,12 +16,15 @@ use std::{
     sync::{Arc, RwLock},
 };
 
+pub mod utils;
+use utils::*;
+
 #[derive(Serialize)]
 struct ErrResponse {
     error: &'static str,
 }
 
-struct Tarball {
+pub struct Tarball {
     forge: String, // should be an enum but will handle later
     owner: String,
     repo: String,
@@ -61,55 +66,6 @@ async fn main() {
         .unwrap();
 
     axum::serve(listener, app).await.unwrap();
-}
-
-#[inline]
-fn create_cache_key(tarball: &Tarball) -> String {
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("{forge}-{owner}-{repo}-{archive}")
-}
-
-#[inline]
-fn get_bucket_path(tarball: &Tarball) -> String {
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("{forge}/{owner}/{repo}/{archive}")
-}
-
-#[inline]
-fn github_url(tarball: &Tarball) -> String {
-    #[allow(unused_variables)]
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-    format!("https://github.com/{owner}/{repo}/archive/{archive}")
-}
-
-#[inline]
-fn serve_github_upstream(tarball: &Tarball) -> Response {
-    #[allow(unused_variables)]
-    let Tarball {
-        forge,
-        owner,
-        repo,
-        archive,
-    } = tarball;
-
-    let upstream_url = github_url(&tarball);
-
-    Redirect::temporary(upstream_url.as_str()).into_response()
 }
 
 async fn serve_github_tarball(
@@ -172,4 +128,19 @@ async fn fallback() -> (StatusCode, Json<ErrResponse>) {
             error: "expected /github/{owner}/{repo}/{archive} with .tar.gz",
         }),
     )
+}
+
+#[inline]
+fn serve_github_upstream(tarball: &Tarball) -> Response {
+    #[allow(unused_variables)]
+    let Tarball {
+        forge,
+        owner,
+        repo,
+        archive,
+    } = tarball;
+
+    let upstream_url = github_url(&tarball);
+
+    Redirect::temporary(upstream_url.as_str()).into_response()
 }
