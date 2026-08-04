@@ -1,5 +1,3 @@
-use std::fmt;
-
 pub struct Forge {
     name: &'static str,
     baseurl: &'static str,
@@ -11,18 +9,8 @@ impl Forge {
     }
 }
 
-// https://stackoverflow.com/questions/32710187/how-do-i-get-an-enum-as-a-string
-impl std::fmt::Display for Forge {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt::Display::fmt(&self.name, f)
-    }
-}
-
-// https://github.com/nixos/nixpkgs/archive/78ee0abaa454bc057b6e5623b188b9f4b87be24a.tar.gz
 pub const GITHUB: Forge = Forge::new("github", "https://github.com/{}/{}/archive/{}");
-// https://gitlab.com/ethancedwards/dotfiles/-/archive/9c694310c38d4c1e73e56e10ef0aab1ee2601897.tar.gz
 pub const GITLAB: Forge = Forge::new("gitlab", "https://gitlab.com/{}/{}/-/archive/{}");
-// https://git.sr.ht/~misterio/nix-colors/archive/81c0629d3a9a77e2a1d0b381a91760e34149a97d.tar.gz
 pub const SOURCEHUT: Forge = Forge::new("sourcehut", "https://git.sr.ht/~{}/{}/archive/{}");
 
 pub struct Tarball {
@@ -45,22 +33,25 @@ impl Tarball {
     pub fn get_key(&self) -> String {
         format!(
             "{}-{}-{}-{}",
-            self.forge, self.owner, self.repo, self.archive
+            self.forge.name, self.owner, self.repo, self.archive
         )
     }
 
     pub fn get_path(&self) -> String {
         format!(
             "{}/{}/{}/{}",
-            self.forge, self.owner, self.repo, self.archive
+            self.forge.name, self.owner, self.repo, self.archive
         )
     }
 
     pub fn get_url(&self) -> String {
-        format!(
-            "https://github.com/{}/{}/archive/{}",
-            self.owner, self.repo, self.archive
-        )
+        // this feels cursed and messy but idk apparenlty `format!` only accepts
+        // compile time strings
+        self.forge
+            .baseurl
+            .replacen("{}", &self.owner, 1)
+            .replacen("{}", &self.repo, 1)
+            .replacen("{}", &self.archive, 1)
     }
 }
 
@@ -77,13 +68,22 @@ mod tests {
         )
     }
 
-    fn tofunix() -> Tarball {
-        Tarball {
-            forge: (),
-            owner: (),
-            repo: (),
-            archive: (),
-        }
+    fn gitlab() -> Tarball {
+        Tarball::new(
+            GITLAB,
+            "ethancedwards".to_string(),
+            "dotfiles".to_string(),
+            "9c694310c38d4c1e73e56e10ef0aab1ee2601897.tar.gz".to_string(),
+        )
+    }
+
+    fn sourcehut() -> Tarball {
+        Tarball::new(
+            SOURCEHUT,
+            "misterio".to_string(),
+            "nix-colors".to_string(),
+            "81c0629d3a9a77e2a1d0b381a91760e34149a97d.tar.gz".to_string(),
+        )
     }
 
     #[test]
@@ -107,6 +107,16 @@ mod tests {
         assert_eq!(
             nixpkgs().get_url(),
             "https://github.com/nixos/nixpkgs/archive/78ee0abaa454bc057b6e5623b188b9f4b87be24a.tar.gz"
-        )
+        );
+
+        assert_eq!(
+            sourcehut().get_url(),
+            "https://git.sr.ht/~misterio/nix-colors/archive/81c0629d3a9a77e2a1d0b381a91760e34149a97d.tar.gz"
+        );
+
+        assert_eq!(
+            gitlab().get_url(),
+            "https://gitlab.com/ethancedwards/dotfiles/-/archive/9c694310c38d4c1e73e56e10ef0aab1ee2601897.tar.gz"
+        );
     }
 }
