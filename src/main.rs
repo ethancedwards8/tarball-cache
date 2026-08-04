@@ -16,7 +16,7 @@ use std::{
 };
 
 pub mod utils;
-use utils::*;
+use utils::{GITHUB, Tarball};
 
 #[derive(Serialize)]
 struct ErrResponse {
@@ -64,7 +64,7 @@ async fn serve_github_tarball(
     Path((owner, repo, archive)): Path<(String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let tarball: Tarball = Tarball::new("github".to_string(), owner, repo, archive);
+    let tarball: Tarball = Tarball::new(GITHUB, owner, repo, archive);
 
     let key = tarball.get_key();
 
