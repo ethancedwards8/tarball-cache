@@ -46,10 +46,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(fallback))
-        .route(
-            "/github/{owner}/{repo}/{archive}",
-            get(serve_github_tarball),
-        )
+        .route("/github/{owner}/{repo}/{archive}", get(serve_tarball))
         .fallback(fallback)
         .with_state(shared_state);
 
@@ -60,7 +57,7 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn serve_github_tarball(
+async fn serve_tarball(
     Path((owner, repo, archive)): Path<(String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
@@ -112,7 +109,7 @@ async fn fallback() -> (StatusCode, Json<ErrResponse>) {
     (
         StatusCode::BAD_REQUEST,
         Json(ErrResponse {
-            error: "expected /github/{owner}/{repo}/{archive} with .tar.gz",
+            error: "expected /{github,gitlab,sourcehut,codeberg}/{owner}/{repo}/{archive} with .tar.gz",
         }),
     )
 }

@@ -11,6 +11,7 @@ impl Forge {
 
 pub const GITHUB: Forge = Forge::new("github", "https://github.com/{}/{}/archive/{}");
 pub const GITLAB: Forge = Forge::new("gitlab", "https://gitlab.com/{}/{}/-/archive/{}");
+pub const CODEBERG: Forge = Forge::new("codeberg", "https://codeberg.org/{}/{}/archive/{}");
 pub const SOURCEHUT: Forge = Forge::new("sourcehut", "https://git.sr.ht/~{}/{}/archive/{}");
 
 pub struct Tarball {
@@ -77,6 +78,15 @@ mod tests {
         )
     }
 
+    fn codeberg() -> Tarball {
+        Tarball::new(
+            CODEBERG,
+            "poz".to_string(),
+            "niri-nix".to_string(),
+            "da8a388cfc14d55f19992c27e6870d836948bc19.tar.gz".to_string(),
+        )
+    }
+
     fn sourcehut() -> Tarball {
         Tarball::new(
             SOURCEHUT,
@@ -118,5 +128,10 @@ mod tests {
             gitlab().get_url(),
             "https://gitlab.com/ethancedwards/dotfiles/-/archive/9c694310c38d4c1e73e56e10ef0aab1ee2601897.tar.gz"
         );
+
+        assert_eq!(
+            codeberg().get_url(),
+            "https://codeberg.org/poz/niri-nix/archive/da8a388cfc14d55f19992c27e6870d836948bc19.tar.gz"
+        )
     }
 }
