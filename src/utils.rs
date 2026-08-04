@@ -1,12 +1,16 @@
 #[derive(Clone, Copy)]
 pub struct Forge {
-    pub name: &'static str,
+    name: &'static str,
     baseurl: &'static str,
 }
 
 impl Forge {
     pub const fn new(name: &'static str, baseurl: &'static str) -> Forge {
         Forge { name, baseurl }
+    }
+
+    pub const fn name(&self) -> &'static str {
+        self.name
     }
 }
 

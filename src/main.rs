@@ -63,7 +63,13 @@ async fn serve_tarball(
     Path((forge, owner, repo, archive)): Path<(String, String, String, String)>,
     State(state): State<Arc<AppState>>,
 ) -> Response {
-    let forgepath = FORGES.iter().find(|f| f.name == forge).unwrap();
+    let Some(forgepath) = FORGES
+        .iter()
+        // rev.tar.gz == 47
+        .find(|f| f.name() == forge && archive.len() == 47)
+    else {
+        return fallback().await;
+    };
 
     let tarball: Tarball = Tarball::new(*forgepath, owner, repo, archive);
 
@@ -83,35 +89,35 @@ async fn serve_tarball(
             Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
-        {
-            let res = reqwest::get(tarball.get_url())
-                .await
-                .expect("Tarball could not be fetched")
-                .bytes()
-                .await
-                .unwrap();
+        let res = reqwest::get(tarball.get_url())
+            .await
+            .expect("Tarball could not be fetched")
+            .bytes()
+            .await
+            .unwrap();
 
-            state
-                .tarball_bucket
-                .put_object(tarball.get_path(), &res)
-                .await
-                .expect("Failed to upload tarball to s3");
+        state
+            .tarball_bucket
+            .put_object(tarball.get_path(), &res)
+            .await
+            .expect("Failed to upload tarball to s3");
 
-            state
-                .cached_tarballs
-                .write()
-                .unwrap()
-                .insert(tarball.get_key(), tarball.get_path());
-        }
+        state
+            .cached_tarballs
+            .write()
+            .unwrap()
+            .insert(tarball.get_key(), tarball.get_path());
+
         Redirect::temporary(tarball.get_url().as_str()).into_response()
     }
 }
 
-async fn fallback() -> (StatusCode, Json<ErrResponse>) {
+async fn fallback() -> Response {
     (
         StatusCode::BAD_REQUEST,
         Json(ErrResponse {
-            error: "expected /{github,gitlab,sourcehut,codeberg}/{owner}/{repo}/{archive} with .tar.gz",
+            error: "expected /{github,gitlab,sourcehut,codeberg}/{owner}/{repo}/{commit}.tar.gz",
         }),
     )
+        .into_response()
 }
