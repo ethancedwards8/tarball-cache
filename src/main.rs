@@ -98,17 +98,19 @@ async fn serve_tarball(
     } else {
         let tarball_download = reqwest::get(tarball.get_url())
             .await
-            .expect("Upstream tarball could not be downloaded")
-            .bytes()
-            .await
-            .expect("Encountered error");
+            .expect("Upstream tarball could not be downloaded");
 
-        let passed_bytes = tarball_download.clone();
+        if tarball_download.status() != reqwest::StatusCode::OK {
+            return fallback().await;
+        }
+
+        let tarball_bytes = tarball_download.bytes().await.expect("Encountered error");
+        let passed_bytes = tarball_bytes.clone();
 
         tokio::spawn(async move {
             state
                 .tarball_bucket
-                .put_object(tarball.get_path(), &tarball_download)
+                .put_object(tarball.get_path(), &passed_bytes)
                 .await
                 .expect("Failed to upload tarball to s3");
 
@@ -119,7 +121,7 @@ async fn serve_tarball(
                 .insert(tarball.get_path());
         });
 
-        (StatusCode::OK, passed_bytes).into_response()
+        (StatusCode::OK, tarball_bytes).into_response()
     }
 }
 
