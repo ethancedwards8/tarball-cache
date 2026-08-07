@@ -80,7 +80,12 @@ async fn serve_tarball(
 
     let tarball: Tarball = Tarball::new(*forgepath, owner, repo, archive);
 
-    if state.cached_tarballs.read().unwrap().contains(&key) {
+    if state
+        .cached_tarballs
+        .read()
+        .unwrap()
+        .contains(&tarball.get_path())
+    {
         let tarball_object = state
             .tarball_bucket
             .get_object(tarball.get_path())
