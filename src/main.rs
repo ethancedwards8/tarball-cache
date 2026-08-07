@@ -35,8 +35,10 @@ async fn main() {
     let account =
         std::env::var("CLOUDFLARE_ACCOUNT").expect("Please set the CLOUDFLARE_ACCOUNT variable");
 
+    let bucket = std::env::var("CACHE_BUCKET").expect("Please set CACHE_BUCKET variable");
+
     let bucket = Bucket::new(
-        "tarball-cache",
+        bucket.as_str(),
         Region::R2 {
             account_id: account,
         },
