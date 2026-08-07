@@ -80,8 +80,6 @@ async fn serve_tarball(
 
     let tarball: Tarball = Tarball::new(*forgepath, owner, repo, archive);
 
-    let key = tarball.get_path();
-
     if state.cached_tarballs.read().unwrap().contains(&key) {
         let tarball_object = state
             .tarball_bucket
@@ -92,10 +90,38 @@ async fn serve_tarball(
         if tarball_object.status_code() == 200 {
             (StatusCode::OK, tarball_object.bytes().clone()).into_response()
         } else {
-            println!("We probably shouldn't have reached this state, but here we are...");
+            println!(
+                "We probably shouldn't have reached this state, but here we are... redirecting just in case"
+            );
             Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
+        let (_, status) = state
+            .tarball_bucket
+            .head_object(tarball.get_path())
+            .await
+            .expect("Failed to check bucket");
+
+        if status == reqwest::StatusCode::OK {
+            state
+                .cached_tarballs
+                .write()
+                .unwrap()
+                .insert(tarball.get_path());
+
+            return (
+                StatusCode::OK,
+                state
+                    .tarball_bucket
+                    .get_object(tarball.get_path())
+                    .await
+                    .unwrap()
+                    .bytes()
+                    .clone(),
+            )
+                .into_response();
+        }
+
         let tarball_download = reqwest::get(tarball.get_url())
             .await
             .expect("Upstream tarball could not be downloaded");
