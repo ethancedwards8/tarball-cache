@@ -49,6 +49,13 @@
         in rec {
           default = (pkgs.callPackage ./Cargo.nix { }).workspaceMembers.tarball-cache.build;
           tarball-cache = default;
+
+          docker = pkgs.dockerTools.buildImage {
+            name = "ethancedwards8/tarball-cache";
+            config = {
+              Cmd = [ "${default}/bin/tarball-cache" ];
+            };
+          };
         }
       );
 
