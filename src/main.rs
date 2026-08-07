@@ -92,16 +92,26 @@ async fn serve_tarball(
             Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
-        let res = reqwest::get(tarball.get_url())
-            .await
-            .expect("Tarball could not be fetched")
-            .bytes()
-            .await
-            .unwrap();
+        let tarball_response = cache_miss(tarball, axum::extract::State(state));
 
+        tarball_response.await
+    }
+}
+
+async fn cache_miss(tarball: Tarball, State(state): State<Arc<AppState>>) -> Response {
+    let tarball_download = reqwest::get(tarball.get_url())
+        .await
+        .expect("Upstream tarball could not be downloaded")
+        .bytes()
+        .await
+        .expect("Encountered error");
+
+    let passed_bytes = tarball_download.clone();
+
+    tokio::spawn(async move {
         state
             .tarball_bucket
-            .put_object(tarball.get_path(), &res)
+            .put_object(tarball.get_path(), &tarball_download)
             .await
             .expect("Failed to upload tarball to s3");
 
@@ -110,20 +120,9 @@ async fn serve_tarball(
             .write()
             .unwrap()
             .insert(tarball.get_key(), tarball.get_path());
+    });
 
-        Redirect::temporary(tarball.get_url().as_str()).into_response()
-    }
-}
-
-async fn cache_miss(tarball: Tarball) -> Response {
-    let tarball_download = reqwest::get(tarball.get_url())
-        .await
-        .expect("Upstream tarball could not be downloaded")
-        .bytes()
-        .await
-        .expect("Encountered error");
-
-    (StatusCode::OK, tarball_download.clone()).into_response()
+    (StatusCode::OK, passed_bytes).into_response()
 }
 
 async fn fallback() -> Response {
