@@ -1,5 +1,6 @@
 interesting:
 - https://github.com/xacrimon/dashmap
 
-
 - https://www.keycdn.com/blog/http-cache-headers
+
+- support https://github.com/NixOS/nix/blob/master/src/libstore/filetransfer.cc#L415-L423

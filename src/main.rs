@@ -94,7 +94,15 @@ async fn serve_tarball(
             .expect("Unexpected entry in hashtable.");
 
         if tarball_object.status_code() == 200 {
-            (StatusCode::OK, tarball_object.bytes().clone()).into_response()
+            (
+                StatusCode::OK,
+                [
+                    (header::CONTENT_TYPE, "application/gzip"),
+                    (header::ETAG, tarball.get_path().as_str()),
+                ],
+                tarball_object.bytes().clone(),
+            )
+                .into_response()
         } else {
             println!(
                 "We probably shouldn't have reached this state, but here we are... redirecting just in case"
@@ -117,7 +125,10 @@ async fn serve_tarball(
 
             return (
                 StatusCode::OK,
-                [(header::CONTENT_TYPE, "application/gzip")],
+                [
+                    (header::CONTENT_TYPE, "application/gzip"),
+                    (header::ETAG, tarball.get_path().as_str()),
+                ],
                 state
                     .tarball_bucket
                     .get_object(tarball.get_path())
