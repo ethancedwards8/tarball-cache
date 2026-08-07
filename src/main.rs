@@ -101,7 +101,7 @@ async fn serve_tarball(
             .expect("Upstream tarball could not be downloaded");
 
         if tarball_download.status() != reqwest::StatusCode::OK {
-            return fallback().await;
+            return (tarball_download.status(), "upstream returned an error").into_response();
         }
 
         let tarball_bytes = tarball_download.bytes().await.expect("Encountered error");
