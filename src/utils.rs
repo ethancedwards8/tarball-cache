@@ -38,13 +38,6 @@ impl Tarball {
         }
     }
 
-    pub fn get_key(&self) -> String {
-        format!(
-            "{}-{}-{}-{}",
-            self.forge.name, self.owner, self.repo, self.archive
-        )
-    }
-
     pub fn get_path(&self) -> String {
         format!(
             "{}/{}/{}/{}",
@@ -100,14 +93,6 @@ mod tests {
             "misterio".to_string(),
             "nix-colors".to_string(),
             "81c0629d3a9a77e2a1d0b381a91760e34149a97d.tar.gz".to_string(),
-        )
-    }
-
-    #[test]
-    fn check_key() {
-        assert_eq!(
-            nixpkgs().get_key(),
-            "github-nixos-nixpkgs-78ee0abaa454bc057b6e5623b188b9f4b87be24a.tar.gz"
         )
     }
 

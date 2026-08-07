@@ -80,7 +80,7 @@ async fn serve_tarball(
 
     let tarball: Tarball = Tarball::new(*forgepath, owner, repo, archive);
 
-    let key = tarball.get_key();
+    let key = tarball.get_path();
 
     if state.cached_tarballs.read().unwrap().contains_key(&key) {
         let tarball_object = state
@@ -116,7 +116,7 @@ async fn serve_tarball(
                 .cached_tarballs
                 .write()
                 .unwrap()
-                .insert(tarball.get_key(), tarball.get_path());
+                .insert(tarball.get_path(), tarball.get_path());
         });
 
         (StatusCode::OK, passed_bytes).into_response()
