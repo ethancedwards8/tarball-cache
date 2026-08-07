@@ -4,6 +4,7 @@ use axum::{
     Json, Router,
     extract::{Path, State},
     http::StatusCode,
+    http::header,
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
@@ -101,13 +102,13 @@ async fn serve_tarball(
             Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
-        let (_, status) = state
+        let exists = state
             .tarball_bucket
-            .head_object(tarball.get_path())
+            .object_exists(tarball.get_path())
             .await
             .expect("Failed to check bucket");
 
-        if status == reqwest::StatusCode::OK {
+        if exists {
             state
                 .cached_tarballs
                 .write()
@@ -116,6 +117,7 @@ async fn serve_tarball(
 
             return (
                 StatusCode::OK,
+                [(header::CONTENT_TYPE, "application/gzip")],
                 state
                     .tarball_bucket
                     .get_object(tarball.get_path())
@@ -138,6 +140,7 @@ async fn serve_tarball(
         let tarball_bytes = tarball_download.bytes().await.expect("Encountered error");
         let passed_bytes = tarball_bytes.clone();
 
+        // don't want upload to block serving
         tokio::spawn(async move {
             state
                 .tarball_bucket
@@ -152,7 +155,12 @@ async fn serve_tarball(
                 .insert(tarball.get_path());
         });
 
-        (StatusCode::OK, tarball_bytes).into_response()
+        (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, "application/gzip")],
+            tarball_bytes,
+        )
+            .into_response()
     }
 }
 
