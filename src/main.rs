@@ -104,7 +104,7 @@ async fn serve_tarball(
             )
                 .into_response()
         } else {
-            println!(
+            eprintln!(
                 "We probably shouldn't have reached this state, but here we are... redirecting just in case"
             );
             Redirect::temporary(tarball.get_url().as_str()).into_response()
