@@ -31,6 +31,7 @@
             git
             cargo
             crate2nix
+            rclone
             rust-analyzer
             nil
             rustc

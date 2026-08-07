@@ -32,10 +32,13 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    let account =
+        std::env::var("CLOUDFLARE_ACCOUNT").expect("Please set the CLOUDFLARE_ACCOUNT variable");
+
     let bucket = Bucket::new(
         "tarball-cache",
         Region::R2 {
-            account_id: "14a8704b05622c623affefb0d8dd93d4".to_string(),
+            account_id: account,
         },
         Credentials::default().unwrap(),
     )
@@ -110,6 +113,17 @@ async fn serve_tarball(
 
         Redirect::temporary(tarball.get_url().as_str()).into_response()
     }
+}
+
+async fn cache_miss(tarball: Tarball) -> Response {
+    let tarball_download = reqwest::get(tarball.get_url())
+        .await
+        .expect("Upstream tarball could not be downloaded")
+        .bytes()
+        .await
+        .expect("Encountered error");
+
+    (StatusCode::OK, tarball_download.clone()).into_response()
 }
 
 async fn fallback() -> Response {
