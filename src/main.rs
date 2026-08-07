@@ -99,6 +99,7 @@ async fn serve_tarball(
                 [
                     (header::CONTENT_TYPE, "application/gzip"),
                     (header::ETAG, tarball.get_path().as_str()),
+                    (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
                 ],
                 tarball_object.bytes().clone(),
             )
@@ -128,6 +129,7 @@ async fn serve_tarball(
                 [
                     (header::CONTENT_TYPE, "application/gzip"),
                     (header::ETAG, tarball.get_path().as_str()),
+                    (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
                 ],
                 state
                     .tarball_bucket
@@ -150,6 +152,7 @@ async fn serve_tarball(
 
         let tarball_bytes = tarball_download.bytes().await.expect("Encountered error");
         let passed_bytes = tarball_bytes.clone();
+        let etag = tarball.get_path();
 
         // don't want upload to block serving
         tokio::spawn(async move {
@@ -168,7 +171,11 @@ async fn serve_tarball(
 
         (
             StatusCode::OK,
-            [(header::CONTENT_TYPE, "application/gzip")],
+            [
+                (header::CONTENT_TYPE, "application/gzip"),
+                (header::ETAG, etag.as_str()),
+                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+            ],
             tarball_bytes,
         )
             .into_response()
