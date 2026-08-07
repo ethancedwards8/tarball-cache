@@ -2,6 +2,7 @@
 
 use axum::{
     Json, Router,
+    body::Bytes,
     extract::{Path, State},
     http::StatusCode,
     http::header,
@@ -94,16 +95,7 @@ async fn serve_tarball(
             .expect("Unexpected entry in hashtable.");
 
         if tarball_object.status_code() == 200 {
-            (
-                StatusCode::OK,
-                [
-                    (header::CONTENT_TYPE, "application/gzip"),
-                    (header::ETAG, tarball.get_path().as_str()),
-                    (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-                ],
-                tarball_object.bytes().clone(),
-            )
-                .into_response()
+            tarball_response(tarball.get_path().as_str(), tarball_object.bytes().clone())
         } else {
             eprintln!(
                 "We probably shouldn't have reached this state, but here we are... redirecting just in case"
@@ -124,13 +116,8 @@ async fn serve_tarball(
                 .unwrap()
                 .insert(tarball.get_path());
 
-            return (
-                StatusCode::OK,
-                [
-                    (header::CONTENT_TYPE, "application/gzip"),
-                    (header::ETAG, tarball.get_path().as_str()),
-                    (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-                ],
+            return tarball_response(
+                tarball.get_path().as_str(),
                 state
                     .tarball_bucket
                     .get_object(tarball.get_path())
@@ -138,8 +125,7 @@ async fn serve_tarball(
                     .unwrap()
                     .bytes()
                     .clone(),
-            )
-                .into_response();
+            );
         }
 
         let tarball_download = reqwest::get(tarball.get_url())
@@ -151,14 +137,14 @@ async fn serve_tarball(
         }
 
         let tarball_bytes = tarball_download.bytes().await.expect("Encountered error");
-        let passed_bytes = tarball_bytes.clone();
+        let moved_bytes = tarball_bytes.clone();
         let etag = tarball.get_path();
 
         // don't want upload to block serving
         tokio::spawn(async move {
             state
                 .tarball_bucket
-                .put_object(tarball.get_path(), &passed_bytes)
+                .put_object(tarball.get_path(), &moved_bytes)
                 .await
                 .expect("Failed to upload tarball to s3");
 
@@ -169,17 +155,21 @@ async fn serve_tarball(
                 .insert(tarball.get_path());
         });
 
-        (
-            StatusCode::OK,
-            [
-                (header::CONTENT_TYPE, "application/gzip"),
-                (header::ETAG, etag.as_str()),
-                (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
-            ],
-            tarball_bytes,
-        )
-            .into_response()
+        tarball_response(etag.as_str(), tarball_bytes)
     }
+}
+
+fn tarball_response(etag: &str, body: Bytes) -> Response {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/gzip"),
+            (header::ETAG, etag),
+            (header::CACHE_CONTROL, "public, max-age=31536000, immutable"),
+        ],
+        body,
+    )
+        .into_response()
 }
 
 async fn fallback() -> Response {
