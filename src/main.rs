@@ -40,7 +40,7 @@ async fn main() {
         Region::R2 {
             account_id: account,
         },
-        Credentials::default().unwrap(),
+        Credentials::default().expect("Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY"),
     )
     .expect("Bucket access failed");
 
@@ -57,9 +57,11 @@ async fn main() {
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
         .await
-        .unwrap();
+        .expect("Failed to bind local address");
 
-    axum::serve(listener, app).await.unwrap();
+    axum::serve(listener, app)
+        .await
+        .expect("Failed to start axum server");
 }
 
 async fn serve_tarball(
@@ -69,7 +71,7 @@ async fn serve_tarball(
     let Some(forgepath) = FORGES
         .iter()
         // rev.tar.gz == 47
-        .find(|f| f.name() == forge && archive.len() == 47)
+        .find(|f| f.name() == forge)
     else {
         return fallback().await;
     };
@@ -92,37 +94,31 @@ async fn serve_tarball(
             Redirect::temporary(tarball.get_url().as_str()).into_response()
         }
     } else {
-        let tarball_response = cache_miss(tarball, axum::extract::State(state));
-
-        tarball_response.await
-    }
-}
-
-async fn cache_miss(tarball: Tarball, State(state): State<Arc<AppState>>) -> Response {
-    let tarball_download = reqwest::get(tarball.get_url())
-        .await
-        .expect("Upstream tarball could not be downloaded")
-        .bytes()
-        .await
-        .expect("Encountered error");
-
-    let passed_bytes = tarball_download.clone();
-
-    tokio::spawn(async move {
-        state
-            .tarball_bucket
-            .put_object(tarball.get_path(), &tarball_download)
+        let tarball_download = reqwest::get(tarball.get_url())
             .await
-            .expect("Failed to upload tarball to s3");
+            .expect("Upstream tarball could not be downloaded")
+            .bytes()
+            .await
+            .expect("Encountered error");
 
-        state
-            .cached_tarballs
-            .write()
-            .unwrap()
-            .insert(tarball.get_key(), tarball.get_path());
-    });
+        let passed_bytes = tarball_download.clone();
 
-    (StatusCode::OK, passed_bytes).into_response()
+        tokio::spawn(async move {
+            state
+                .tarball_bucket
+                .put_object(tarball.get_path(), &tarball_download)
+                .await
+                .expect("Failed to upload tarball to s3");
+
+            state
+                .cached_tarballs
+                .write()
+                .unwrap()
+                .insert(tarball.get_key(), tarball.get_path());
+        });
+
+        (StatusCode::OK, passed_bytes).into_response()
+    }
 }
 
 async fn fallback() -> Response {
