@@ -11,7 +11,7 @@ use s3::creds::Credentials;
 use s3::{Bucket, Region};
 use serde::Serialize;
 use std::{
-    collections::HashMap,
+    collections::HashSet,
     sync::{Arc, RwLock},
 };
 
@@ -26,7 +26,7 @@ struct ErrResponse {
 }
 
 struct AppState {
-    cached_tarballs: RwLock<HashMap<String, String>>,
+    cached_tarballs: RwLock<HashSet<String>>,
     tarball_bucket: Box<Bucket>,
 }
 
@@ -47,7 +47,7 @@ async fn main() {
     .expect("Bucket access failed");
 
     let shared_state = Arc::new(AppState {
-        cached_tarballs: RwLock::new(HashMap::new()),
+        cached_tarballs: RwLock::new(HashSet::new()),
         tarball_bucket: bucket,
     });
 
@@ -82,7 +82,7 @@ async fn serve_tarball(
 
     let key = tarball.get_path();
 
-    if state.cached_tarballs.read().unwrap().contains_key(&key) {
+    if state.cached_tarballs.read().unwrap().contains(&key) {
         let tarball_object = state
             .tarball_bucket
             .get_object(tarball.get_path())
@@ -116,7 +116,7 @@ async fn serve_tarball(
                 .cached_tarballs
                 .write()
                 .unwrap()
-                .insert(tarball.get_path(), tarball.get_path());
+                .insert(tarball.get_path());
         });
 
         (StatusCode::OK, passed_bytes).into_response()
