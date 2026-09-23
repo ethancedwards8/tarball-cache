@@ -32,7 +32,7 @@
               done
             '';
         in {
-          default = pkgs.mkShell { packages = [ nixWithPlugin ]; };
+          default = pkgs.mkShell { packages = with pkgs; [ nixWithPlugin cargo ]; };
         });
     };
 }
