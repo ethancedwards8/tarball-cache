@@ -1,63 +1,38 @@
 {
-  description = "dracula.sh powerline";
-
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-
-    crate2nix.url = "github:nix-community/crate2nix";
-    crate2nix.inputs.nixpkgs.follows = "nixpkgs";
-
-    flake-compat = {
-      url = "github:NixOS/flake-compat";
-      flake = false;
-    };
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    cargo-nix-plugin.url = "github:anthropics/cargo-nix-plugin";
+    cargo-nix-plugin.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ self, nixpkgs, ... }:
-  let
+  outputs = { self, nixpkgs, cargo-nix-plugin }:
+    let
       forAllSystems = nixpkgs.lib.genAttrs nixpkgs.lib.systems.flakeExposed;
-  in
-    {
-      devShell = forAllSystems (system:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            overlays = [ inputs.crate2nix.overlays.default ];
-          };
-        in
-        with pkgs;
-        mkShell {
-          buildInputs = [
-            git
-            cargo
-            crate2nix
-            rclone
-            rust-analyzer
-            nil
-            rustc
-            rustfmt
-            clippy
-          ];
-        }
-      );
-
+    in {
       packages = forAllSystems (system:
         let
-          pkgs = import nixpkgs {
-            inherit system;
-          };
-        in rec {
-          default = (pkgs.callPackage ./Cargo.nix { }).workspaceMembers.tarball-cache.build;
-          tarball-cache = default;
+          pkgs = nixpkgs.legacyPackages.${system};
+          cargoNix = cargo-nix-plugin.lib { inherit pkgs; src = ./.; };
+        in {
+          default = cargoNix.rootCrate.build;
+        });
 
-          docker = pkgs.dockerTools.buildImage {
-            name = "ethancedwards8/tarball-cache";
-            config = {
-              Cmd = [ "${default}/bin/tarball-cache" ];
-            };
-          };
-        }
-      );
+      devShells = forAllSystems (system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
 
+          # The plugin must be loaded by the exact Nix it was built against.
+          plugin = cargo-nix-plugin.packages.${system}.cargo-nix-plugin-nix_2_34;
+          nixWithPlugin = pkgs.runCommand "nix-with-cargo-nix-plugin"
+            { nativeBuildInputs = [ pkgs.makeWrapper ]; }
+            ''
+              for prog in nix nix-build nix-instantiate nix-shell nix-store nix-env; do
+                makeWrapper ${pkgs.nixVersions.nix_2_34}/bin/nix "$out/bin/$prog" --argv0 "$prog" \
+                  --add-flags "--option plugin-files ${plugin}/lib/nix/plugins"
+              done
+            '';
+        in {
+          default = pkgs.mkShell { packages = [ nixWithPlugin ]; };
+        });
     };
 }
